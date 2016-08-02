@@ -140,23 +140,25 @@ MATCHER is a two-argument predicate."
 Return these values:
  SYMBOL-NAME
  PACKAGE-NAME, or nil if the designator does not include an explicit package.
- PACKAGE, generally the package to complete in. (However, if PACKAGE-NAME is 
-          NIL, return the respective package of DEFAULT-PACKAGE-NAME instead; 
+ PACKAGE, generally the package to complete in. (However, if PACKAGE-NAME is
+          NIL, return the respective package of DEFAULT-PACKAGE-NAME instead;
           if PACKAGE is non-NIL but a package cannot be found under that name,
           return NIL.)
  INTERNAL-P, if the symbol is qualified with `::'."
   (multiple-value-bind (name package-name internal-p)
       (tokenize-symbol string)
-    (if package-name
-	(let ((package (guess-package (if (equal package-name "")
-					  (symbol-name :keyword)
-					  package-name))))
-	  (values name package-name package internal-p))
-	(let ((package (guess-package default-package-name)))
-	  (values name package-name (or package *buffer-package*) internal-p))
-	)))
-
-
+    (flet ((default-package ()
+	     (or (guess-package default-package-name) *buffer-package*)))
+      (let ((package (cond
+		       ((not package-name)
+			(default-package))
+		       ((equal package-name "")
+			(guess-package (symbol-name :keyword)))
+		       ((find-locally-nicknamed-package
+			 package-name (default-package)))
+		       (t
+			(guess-package package-name)))))
+	(values name package-name package internal-p)))))
 
 (defun completion-output-case-converter (input &optional with-escaping-p)
   "Return a function to convert strings for the completion output.
@@ -236,8 +238,8 @@ DELIMITER may be a character, or a list of characters."
 			         delimiter))))
     (lambda (prefix target)
       (declare (type simple-string prefix target))
-      (loop for ch across prefix
-	    with tpos = 0
+      (loop with tpos = 0
+	    for ch across prefix
 	    always (and (< tpos (length target))
 			(let ((delimiter (car (member ch delimiters :test test))))
 			  (if delimiter

@@ -135,7 +135,7 @@
    mop:slot-definition-writers
    slot-boundp-using-class
    slot-value-using-class
-   ))
+   mop:slot-makunbound-using-class))
 
 ;;;; TCP Server
 
@@ -281,8 +281,17 @@
 (defimplementation function-name (function)
   (nth-value 2 (function-lambda-expression function)))
 
-(defimplementation macroexpand-all (form)
-  (macroexpand form))
+(defimplementation macroexpand-all (form &optional env)
+  (ext:macroexpand-all form env))
+
+(defimplementation collect-macro-forms (form &optional env)
+  ;; Currently detects only normal macros, not compiler macros.
+  (declare (ignore env))
+  (with-collected-macro-forms (macro-forms)
+      (handler-bind ((warning #'muffle-warning))
+        (ignore-errors
+          (compile nil `(lambda () ,(macroexpand-all form env)))))
+    (values macro-forms nil)))
 
 (defimplementation describe-symbol-for-emacs (symbol)
   (let ((result '()))
@@ -814,3 +823,7 @@ part of *sysdep-pathnames* in swank.loader.lisp.
 
 (defimplementation quit-lisp ()
   (ext:exit))
+;;;
+#+#.(swank/backend:with-symbol 'package-local-nicknames 'ext)
+(defimplementation package-local-nicknames (package)
+  (ext:package-local-nicknames package))

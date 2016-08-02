@@ -86,6 +86,9 @@ which is used just to send output.")
   "The buffering scheme that should be used for the output stream.
 Valid values are nil, t, :line")
 
+(defvar *globally-redirect-io* nil
+  "When non-nil globally redirect all standard streams to Emacs.")
+
 (defun open-streams (connection properties)
   "Return the 5 streams for IO redirection:
 DEDICATED-OUTPUT INPUT OUTPUT IO REPL-RESULTS"
@@ -194,13 +197,14 @@ This is an optimized way for Lisp to deliver output to Emacs."
     (initialize-streams-for-connection conn `(:coding-system ,coding-system))
     (with-struct* (connection. @ conn)
       (setf (@ env)
-            `((*standard-output* . ,(@ user-output))
-              (*standard-input*  . ,(@ user-input))
-              (*trace-output*    . ,(or (@ trace-output) (@ user-output)))
-              (*error-output*    . ,(@ user-output))
-              (*debug-io*        . ,(@ user-io))
-              (*query-io*        . ,(@ user-io))
-              (*terminal-io*     . ,(@ user-io))))
+	    `((*standard-input*  . ,(@ user-input))
+	      ,@(unless *globally-redirect-io*
+		  `((*standard-output* . ,(@ user-output))
+		    (*trace-output*    . ,(or (@ trace-output) (@ user-output)))
+		    (*error-output*    . ,(@ user-output))
+		    (*debug-io*        . ,(@ user-io))
+		    (*query-io*        . ,(@ user-io))
+		    (*terminal-io*     . ,(@ user-io))))))
       (maybe-redirect-global-io conn)
       (add-hook *connection-closed-hook* 'update-redirection-after-close)
       (typecase conn
@@ -322,9 +326,6 @@ LISTENER-EVAL directly, so that spacial variables *, etc are set."
 ;;; *CURRENT-STANDARD-INPUT*, etc. We never shadow the "current"
 ;;; variables, so they can always be assigned to affect a global
 ;;; change.
-
-(defvar *globally-redirect-io* nil
-  "When non-nil globally redirect all standard streams to Emacs.")
 
 ;;;;; Global redirection setup
 

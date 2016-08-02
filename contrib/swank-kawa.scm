@@ -22,7 +22,7 @@
       '((kawa
          ("java"
           ;; needed jar files
-          "-cp" "kawa-1.14.jar:swank-kawa.jar:/opt/jdk1.6.0/lib/tools.jar"
+          "-cp" "kawa-2.0.1.jar:swank-kawa.jar:/opt/jdk1.8.0/lib/tools.jar"
           ;; channel for debugger
           "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n"
           ;; depending on JVM, compiler may need more stack
@@ -44,6 +44,11 @@
                   ;;     "/scratch/kawa")
                   ;;   swank-java-source-path))
                   )))
+
+;; Optionally define a command to start it.
+(defun kawa ()
+  (interactive)
+  (slime 'kawa))
 
 |#
 ;; 4. Start everything with  M-- M-x slime kawa
@@ -1578,7 +1583,11 @@
 
 ;; Enable breakpoints event on the breakpoint function.
 (df request-breakpoint ((vm <vm>))
-  (let* ((class :: <class-type> (1st (! classesByName vm "swank$Mnkawa")))
+  (let* ((swank-classes (! classesByName vm "swank-kawa"))
+         (swank-classes-legacy (! classesByName vm "swank$Mnkawa"))
+         (class :: <class-type> (1st (if (= (length swank-classes) 0)
+                                         swank-classes-legacy
+                                         swank-classes)))
          (meth :: <meth-ref> (1st (! methodsByName class "breakpoint")))
          (erm (! eventRequestManager vm))
          (req (! createBreakpointRequest erm (! location meth))))
@@ -1964,8 +1973,14 @@
 (df init-global-field ((vm <vm>))
   (when (nul? *global-get-mirror*)
     (set (@s <swank-global-variable> var) #!null) ; prepare class
-    (let* ((c (as <com.sun.jdi.ClassType>
-                  (1st (! classes-by-name vm "swank$Mnglobal$Mnvariable"))))
+    (let* ((swank-global-variable-classes
+            (! classes-by-name vm "swank-global-variable"))
+           (swank-global-variable-classes-legacy
+            (! classes-by-name vm "swank$Mnglobal$Mnvariable"))
+           (c (as <com.sun.jdi.ClassType>
+                  (1st (if (= (length swank-global-variable-classes) 0)
+                           swank-global-variable-classes-legacy
+                           swank-global-variable-classes))))
            (f (! fieldByName c "var")))
       (set *global-get-mirror* (fun () (! getValue c f)))
       (set *global-set-mirror* (fun ((v <obj-ref>)) (! setValue c f v))))

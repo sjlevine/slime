@@ -328,7 +328,17 @@
     (function (si:compiled-function-name f))))
 
 ;; FIXME
-;; (defimplementation macroexpand-all (form))
+;; (defimplementation macroexpand-all (form &optional env)
+;; (declare (ignore env))
+
+(defimplementation collect-macro-forms (form &optional env)
+  ;; Currently detects only normal macros, not compiler macros.
+  (declare (ignore env))
+  (with-collected-macro-forms (macro-forms)
+    (handler-bind ((warning #'muffle-warning))
+      (ignore-errors
+        (compile nil `(lambda () ,form))))
+    (values macro-forms nil)))
 
 (defimplementation describe-symbol-for-emacs (symbol)
   (let ((result '()))
@@ -451,16 +461,15 @@
       (funcall debugger-loop-fn))))
 
 (defimplementation compute-backtrace (start end)
-  (when (numberp end)
-    (setf end (min end (length *backtrace*))))
-  (loop for f in (subseq *backtrace* start end)
-        collect f))
+  (subseq *backtrace* start
+          (and (numberp end)
+               (min end (length *backtrace*)))))
 
 (defun frame-name (frame)
   (let ((x (first frame)))
     (if (symbolp x)
-      x
-      (function-name x))))
+        x
+        (function-name x))))
 
 (defun function-position (fun)
   (multiple-value-bind (file position)
